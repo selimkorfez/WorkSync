@@ -1,0 +1,44 @@
+<div th:fragment="navbar">
+  <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm px-4 py-2 mb-4">
+    <div class="container-fluid">
+      <a class="navbar-brand fw-bold text-primary" th:href="@{/}">WorkSync</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent"
+              aria-controls="navbarContent" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+
+      <div class="collapse navbar-collapse justify-content-end" id="navbarContent">
+        <ul class="navbar-nav gap-3">
+
+          <li class="nav-item d-none">
+            <a id="admin-link" class="nav-link text-warning" href="#">Admin Dashboard</a>
+          </li>
+
+
+
+
+          <li class="nav-item">
+            <a class="nav-link" th:href="@{/}">Home</a>
+          </li>
+
+
+
+
+          <li class="nav-item">
+            <a class="nav-link" th:href="@{/tasks/form}">Create Task</a>
+<!--            <a class="nav-link" th:href="@{/tasks/form(uid=${uid})}">Create Task</a>-->
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" th:href="@{/tasks/list}">View Tasks</a>
+<!--            <a class="nav-link" th:href="@{/tasks/list(uid=${uid})}">View Tasks</a>-->
+          </li>
+          <li class="nav-item" th:if="${page != 'tasks'}">
+            <a class="nav-link text-danger" href="#" onclick="logout()">Logout</a>
+<!--            <a class="nav-link text-danger" th:href="@{/logout(uid=${uid})}">Logout</a>-->
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+</div>

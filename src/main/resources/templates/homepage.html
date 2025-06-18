@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>WorkSync Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet" />
+
+  <style>
+    body {
+      background: linear-gradient(to right, #f5f7fa, #c3cfe2);
+      font-family: 'Segoe UI', sans-serif;
+    }
+
+    .hero-card {
+      border-radius: 12px;
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+      padding: 2rem;
+      background-color: white;
+      margin-top: 3rem;
+    }
+
+    .preview-section {
+      margin-top: 3rem;
+    }
+
+    .task-card {
+      background: #fff;
+      border-left: 5px solid #0d6efd;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    }
+
+    .task-card.urgent {
+      border-left-color: #dc3545;
+    }
+
+    .badge-role {
+      font-size: 0.85rem;
+    }
+
+    .actions a.btn:not(#dashboard-btn) {
+      display: none;
+    }
+  </style>
+</head>
+<body class="d-flex flex-column min-vh-100">
+<main class="flex-grow-1">
+<div id="notification-box" class="container d-none mt-3"></div>
+
+<div class="container">
+  <div th:replace="fragments/header :: navbar"></div>
+
+  <!-- Hero -->
+  <div class="hero-card text-center">
+    <h1 class="display-5 fw-bold">Welcome to <span class="text-primary">WorkSync</span></h1>
+    <p class="lead mt-3 fst-italic fw-bold text-dark" id="quote-box" style="opacity: 0; transition: opacity 1s ease;">
+      Loading wisdom...
+    </p>
+
+    <p class="lead mt-3" id="user-info">Loading user info...</p>
+    <span id="role-badge" class="badge bg-secondary badge-role d-none"></span>
+    <p id="random-quote" class="mt-3 text-dark fw-bold"></p>
+
+
+    <div class="actions mt-4">
+      <a id="dashboard-btn" class="btn btn-outline-info" href="#">Go to Dashboard</a>
+    </div>
+  </div>
+
+  <!-- Preview Section -->
+  <div class="row mt-5">
+    <!-- 🔥 Urgent Tasks -->
+    <div class="col-md-6">
+      <h5>🔥 Urgent Tasks</h5>
+      <div id="urgent-tasks"></div>
+      <ul class="list-group">
+        <li th:each="task : ${urgentTasks}" class="list-group-item d-flex justify-content-between align-items-center">
+          <span>
+            <strong th:text="${task.title}">[Title]</strong> –
+            <span th:text="${task.description}">[Description]</span>
+          </span>
+          <span class="badge bg-danger" th:text="${task.status}">[Status]</span>
+        </li>
+        <li th:if="${#lists.isEmpty(urgentTasks)}" class="list-group-item text-muted">No urgent tasks</li>
+      </ul>
+    </div>
+
+    <!-- ⏰ Due Today / Upcoming -->
+    <div class="col-md-6">
+      <h5>⏰ Due Today / Upcoming</h5>
+      <div id="upcoming-tasks"></div>
+      <ul class="list-group">
+        <li th:each="task : ${dueTasks}" class="list-group-item d-flex justify-content-between align-items-center">
+          <span>
+            <strong th:text="${task.title}">[Title]</strong> –
+            <span th:text="${task.description}">[Description]</span>
+          </span>
+          <span class="badge bg-warning text-dark" th:text="${task.deadline}">[Deadline]</span>
+        </li>
+        <li th:if="${#lists.isEmpty(dueTasks)}" class="list-group-item text-muted">No upcoming tasks</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<script>
+  const today = new Date().toISOString().split("T")[0];
+  if (localStorage.getItem("notification-sound-date") !== today) {
+    localStorage.removeItem("notification-sound-played");
+    localStorage.setItem("notification-sound-date", today);
+  }
+
+  const email = localStorage.getItem("email");
+  const uid = localStorage.getItem("uid");
+  const info = document.getElementById("user-info");
+  const badge = document.getElementById("role-badge");
+  const dashboardBtn = document.getElementById("dashboard-btn");
+
+  function logout() {
+    localStorage.clear();
+    window.location.href = "/login";
+  }
+  function dismissAlert(key) {
+    const el = document.getElementById(`alert-${key}`);
+    if (el) {
+      el.remove();
+      localStorage.setItem(`dismissed-${key}`, "true");
+    }
+  }
+
+  window.addEventListener('DOMContentLoaded', async () => {
+    if (!uid || !email) {
+      info.innerText = "User info not found.";
+      setTimeout(() => window.location.href = "/login", 1500);
+      return;
+    }
+
+    info.innerText = `Logged in as: ${email}`;
+    showRandomQuote();
+    if (dashboardBtn) {
+      dashboardBtn.href = `/tasks/dashboard?uid=${uid}`;
+    }
+
+    try {
+      const response = await fetch(`/tasks/notifications?uid=${uid}`);
+      const grouped = await response.json();
+
+      const container = document.getElementById("notification-box");
+      container.innerHTML = "";
+
+      const alerts = {
+        urgent: { icon: "🔥", class: "alert-danger", label: "Urgent Tasks" },
+        dueToday: { icon: "⏰", class: "alert-warning", label: "Due Today" },
+        overdue: { icon: "⚠️", class: "alert-danger", label: "Overdue Tasks" }
+      };
+
+      let total = 0;
+      for (const [key, { icon, class: css, label }] of Object.entries(alerts)) {
+        const group = grouped[key];
+        if (group && group.length > 0) {
+          total += group.length;
+          const dismissedKey = `dismissed-${key}`;
+          if (!localStorage.getItem(dismissedKey)) {
+            container.innerHTML += `
+              <div class="alert ${css} d-flex justify-content-between align-items-center mb-2 p-2 rounded shadow-sm" id="alert-${key}">
+                <div>${icon} ${group.length} ${label}</div>
+                <div>
+                  <a href="/tasks/list" class="btn btn-sm btn-light me-2">View</a>
+                  <button class="btn-close" onclick="dismissAlert('${key}')"></button>
+                </div>
+              </div>`;
+          }
+        }
+      }
+
+      if (total > 0 && !localStorage.getItem("notification-sound-played")) {
+        const audio = new Audio("/alert.mp3");
+        audio.play().catch(err => console.warn("Sound blocked", err));
+        localStorage.setItem("notification-sound-played", "true");
+      }
+
+      if (total > 0) container.classList.remove("d-none");
+    } catch (e) {
+      console.error("Notification fetch failed", e);
+    }
+
+    try {
+      const res = await fetch(`/tasks/api/tasks/preview?uid=${uid}`);
+      const { urgent, upcoming } = await res.json();
+
+      const urgentDiv = document.getElementById("urgent-tasks");
+      const upcomingDiv = document.getElementById("upcoming-tasks");
+
+      urgent.forEach(task => {
+        const el = document.createElement("div");
+        el.className = "task-card urgent";
+        el.innerHTML = `<strong>${task.title}</strong><br><small>${task.description}</small>`;
+        urgentDiv?.appendChild(el);
+      });
+
+      upcoming.forEach(task => {
+        const el = document.createElement("div");
+        el.className = "task-card";
+        el.innerHTML = `<strong>${task.title}</strong><br><small>Due: ${task.deadline}</small>`;
+        upcomingDiv?.appendChild(el);
+      });
+    } catch (e) {
+      console.error("Dashboard preview failed", e);
+    }
+  });
+
+  const quotes = [
+    { text: "Time is what we want most, but what we use worst.", author: "William Penn" },
+    { text: "The key is in not spending time, but in investing it.", author: "Stephen R. Covey" },
+    { text: "It’s not about having time. It’s about making time.", author: "Unknown" },
+    { text: "You may delay, but time will not.", author: "Benjamin Franklin" },
+    { text: "Ordinary people think merely of spending time, great people think of using it.", author: "Arthur Schopenhauer" },
+    { text: "Start by doing what's necessary; then do what's possible; and suddenly you are doing the impossible.", author: "Francis of Assisi" },
+    { text: "Until we can manage time, we can manage nothing else.", author: "Peter Drucker" },
+    { text: "Don’t watch the clock; do what it does. Keep going.", author: "Sam Levenson" },
+  ];
+
+  function showRandomQuote() {
+    const quote = quotes[Math.floor(Math.random() * quotes.length)];
+    const box = document.getElementById("quote-box");
+
+    box.innerHTML = `“${quote.text}”<br><span class="fw-normal fst-normal text-muted">– ${quote.author}</span>`;
+
+    setTimeout(() => {
+      box.style.opacity = 1;
+    }, 100);
+  }
+
+
+</script>
+</main>
+</body>
+
+
+<footer class="text-center text-muted mt-5 p-3 small" style="background-color: #f8f9fa; box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);">
+  WorkSync v1.0 © 2025
+  <span>Developed by Selim Korfez (P2717647)</span>
+
+</footer>
+
+</html>

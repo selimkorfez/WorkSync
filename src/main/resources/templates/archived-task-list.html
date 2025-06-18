@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <meta charset="UTF-8">
+    <title>Archived Tasks</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: #f0f2f5;
+        }
+
+        .archived-table {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.05);
+            padding: 1rem;
+            margin-top: 2rem;
+        }
+
+        .status-badge {
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+<div class="container mt-4" layout:fragment="content" th:with="page='archived'">
+
+    <div class="mb-4">
+        <h2>🗃️ Archived Tasks</h2>
+    </div>
+    <div th:if="${success}" class="alert alert-success alert-dismissible fade show" role="alert">
+        <span th:text="${success}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+
+
+
+    <div class="archived-table">
+        <div th:if="${#lists.isEmpty(archivedTasks)}" class="alert alert-info">
+            No archived tasks found.
+        </div>
+
+        <table class="table table-striped" th:if="${!#lists.isEmpty(archivedTasks)}">
+            <thead class="table-dark">
+            <tr>
+                <th>Title</th>
+                <th>Description</th>
+                <th>Assigned To</th>
+                <th>Created By</th>
+                <th>Deadline</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+            </thead>
+
+            <tbody>
+            <tr th:each="task : ${archivedTasks}">
+                <td th:text="${task.title}">Title</td>
+                <td th:text="${task.description}">Description</td>
+                <td th:text="${uidToName[task.assignedToUid] ?: 'Unnamed User'}">Assignee</td>
+                <td th:text="${uidToName[task.assignedByUid] ?: 'Unknown'}">Creator</td>
+                <td th:text="${task.deadline}">Deadline</td>
+                <td>
+                    <span class="badge bg-success status-badge" th:if="${task.status == 'COMPLETED'}">COMPLETED</span>
+                    <span class="badge bg-info text-dark status-badge" th:if="${task.status == 'IN_PROGRESS'}">IN PROGRESS</span>
+                    <span class="badge bg-secondary status-badge" th:if="${task.status == 'PENDING'}">PENDING</span>
+                </td>
+
+                <td>
+                    <form th:action="@{'/tasks/unarchive/' + ${task.id}}" method="post" style="display:inline;" th:if="${task.status == 'COMPLETED'}">
+                        <button type="submit" class="btn btn-sm btn-outline-warning" onclick="return confirm('Unarchive this task?');">
+                            ♻ Unarchive
+                        </button>
+                    </form>
+                </td>
+
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+</div>
+</body>
+</html>

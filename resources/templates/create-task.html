@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      xmlns="http://www.w3.org/1999/html"
+      layout:decorate="~{layout}">
+<head>
+    <meta charset="UTF-8">
+    <title>Create Task</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .card {
+            margin-top: 3rem;
+            border-radius: 12px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+        }
+
+        .scroll-select {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+
+<div class="container mt-4" layout:fragment="content" th:with="page='tasks'">
+    <div class="card p-4">
+        <h3 class="mb-4">🆕 Create a New Task</h3>
+        <form th:action="@{/tasks/submit}" method="post" th:object="${task}">
+            <input type="hidden" name="uid" th:value="${uid}" />
+            <div class="mb-3">
+                <label class="form-label">Title</label>
+                <input type="text" th:field="*{title}" class="form-control" required />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Description</label>
+                <textarea th:field="*{description}" class="form-control" rows="3" required></textarea>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Assign To</label>
+                <select class="form-select scroll-select" th:field="*{assignedToUid}" id="assignedTo" required>
+                    <option value="" disabled selected>Select a user</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Deadline</label>
+                <input type="date"
+                       th:field="*{deadline}"
+                       id="deadline"
+                       th:attr="min=${#dates.format(#dates.createNow(), 'yyyy-MM-dd')}"
+                       class="form-control"
+                       required />
+            </div>
+
+
+            <div class="form-check mb-3">
+                <input type="checkbox" th:field="*{urgent}" class="form-check-input" id="urgentCheck" />
+                <label class="form-check-label" for="urgentCheck">Mark as Urgent</label>
+            </div>
+
+            <div class="d-grid">
+                <button type="submit" class="btn btn-primary">Submit Task</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const select = document.getElementById("assignedTo");
+            const uidInput = document.querySelector("input[name='uid']");
+            const currentUid = uidInput ? uidInput.value : null;
+
+            if (!select || !currentUid) {
+                console.error("❌ assignedTo or uid input not found");
+                return;
+            }
+
+            fetch(`/api/user/role?uid=${currentUid}`)
+                .then(res => res.text())
+                .then(role => {
+                    const endpoint = role === "ADMIN" ? "/api/user/all" : "/api/user/non-admin";
+                    return fetch(endpoint);
+                })
+                .then(response => response.json())
+                .then(users => {
+                    console.log("✅ Users fetched:", users);
+
+                    if (!Array.isArray(users)) {
+                        console.warn("⚠️ Users is not an array");
+                        return;
+                    }
+
+                    users.forEach(user => {
+                        if (user && user.uid && user.fullName) {
+                            const option = document.createElement("option");
+                            option.value = user.uid;
+                            option.textContent = `${user.fullName} (${user.email})`;
+                            select.appendChild(option);
+                        } else {
+                            console.warn("⛔ Skipped invalid user", user);
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.error("❌ Failed to load users:", error);
+                });
+        });
+    </script>
+</div>
+</html>

@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout}">
+<head>
+    <meta charset="UTF-8">
+    <title>Task List</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: #f0f2f5;
+        }
+
+        .task-table {
+            margin-top: 2rem;
+            background: white;
+            border-radius: 10px;
+            padding: 1rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        .status-badge {
+            font-size: 0.85rem;
+        }
+
+        .late-label {
+            font-size: 0.75rem;
+            color: #dc3545;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+<div class="container mt-4" layout:fragment="content" th:with="page='tasks'">
+
+    <div th:if="${success}" class="alert alert-success alert-dismissible fade show" role="alert">
+        <span th:text="${success}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+
+    <script>
+        const uid = localStorage.getItem("uid");
+        if (uid) {
+            const currentUrl = window.location.pathname;
+            if (!window.location.search.includes("uid=")) {
+                window.location.href = currentUrl + "?uid=" + uid;
+            }
+        }
+    </script>
+
+
+    <div class="d-flex justify-content-between align-items-center mt-4">
+        <h2>📋 Task Overview</h2>
+        <a th:href="@{/tasks/form}" class="btn btn-primary">+ New Task</a>
+    </div>
+    <div class="mb-3 d-flex gap-2 justify-content-end">
+        <th:block th:if="${userRole == 'ADMIN'}">
+            <a class="btn btn-outline-primary"
+               th:href="@{/tasks/assigned(uid=${uid})}">
+                <i class="bi bi-person-lines-fill"></i> View Assigned Tasks
+            </a>
+        </th:block>
+        <a class="btn btn-outline-secondary"
+           th:href="@{/tasks/archived}">
+            <i class="bi bi-archive"></i>  🗃 View Archived Tasks
+        </a>
+    </div>
+
+
+
+
+
+
+    <form method="get" action="/tasks/list" class="row g-2 mt-3 mb-4">
+        <input type="hidden" name="uid" th:value="${uid}" />
+        <div class="col-md-4">
+            <label class="form-label">Sort by:</label>
+            <select name="sort" class="form-select" onchange="this.form.submit()">
+                <option value="">None</option>
+                <option value="deadline" th:selected="${sort == 'deadline'}">Deadline</option>
+                <option value="status" th:selected="${sort == 'status'}">Status</option>
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Filter by status:</label>
+            <select name="status" class="form-select" onchange="this.form.submit()">
+                <option value="" th:selected="${status == null or status == ''}">All</option>
+                <option value="PENDING" th:selected="${status == 'PENDING'}">PENDING</option>
+                <option value="IN_PROGRESS" th:selected="${status == 'IN_PROGRESS'}">IN_PROGRESS</option>
+                <option value="COMPLETED" th:selected="${status == 'COMPLETED'}">COMPLETED</option>
+            </select>
+        </div>
+    </form>
+
+    <div th:if="${#lists.isEmpty(tasks)}" class="alert alert-info">
+        No tasks found.
+    </div>
+
+    <div class="task-table">
+        <table class="table table-striped table-hover">
+            <thead class="table-dark">
+            <tr>
+                <th>Title</th>
+                <th>Description</th>
+                <th>Assigned To</th>
+                <th>Created By</th>
+                <th>Deadline</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr th:each="task : ${tasks}" th:classappend="${task.urgent and task.status != 'COMPLETED'} ? 'table-danger'">
+                <td>
+                    <span th:if="${task.urgent and task.status != 'COMPLETED'}">🔥 </span>
+                    <span th:text="${task.title}">[Title]</span>
+                </td>
+                <td th:text="${task.description}">Task Desc</td>
+                <td th:text="${uidToName[task.assignedToUid] ?: 'Unnamed User'}">UID</td>
+                <td th:text="${uidToName[task.assignedByUid] ?: 'Unknown'}">Creator</td>
+                <td th:text="${task.deadline}">Date</td>
+                <td>
+                    <span class="badge bg-secondary status-badge" th:if="${task.status == 'PENDING'}">PENDING</span>
+                    <span class="badge bg-info text-dark status-badge" th:if="${task.status == 'IN_PROGRESS'}">IN PROGRESS</span>
+                    <span class="badge bg-success status-badge" th:if="${task.status == 'COMPLETED'}">COMPLETED</span>
+                    <span class="late-label" th:if="${task.late}">LATE</span>
+                </td>
+                <td>
+                    <!-- Edit Button -->
+                    <a class="btn btn-sm btn-outline-primary me-1"
+                       th:href="@{'/tasks/edit/' + ${task.id} + '?uid=' + ${uid}}">Edit</a>
+
+                    <!-- Delete Button -->
+                    <a class="btn btn-sm btn-outline-danger me-1"
+                       th:href="@{'/tasks/delete/' + ${task.id}}"
+                       onclick="return confirm('Delete this task?');">Delete</a>
+
+                    <!-- Archive Button for COMPLETED only -->
+                    <form th:action="@{'/tasks/archive/' + ${task.id}}" method="post" style="display:inline;" th:if="${task.status == 'COMPLETED'}">
+                        <button type="submit" class="btn btn-sm btn-outline-secondary" onclick="return confirm('Archive this task?');">
+                            🗃 Archive
+                        </button>
+                    </form>
+                </td>
+
+            </tr>
+            </tbody>
+
+        </table>
+    </div>
+</div>
+</body>
+</html>

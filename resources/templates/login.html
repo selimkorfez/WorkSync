@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en"
+      xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
+<head>
+  <meta charset="UTF-8">
+  <title>WorkSync</title>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+
+  <script>
+    const firebaseConfig = {};
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+
+    // Logout handler
+    window.logout = async function () {
+      try {
+        await auth.signOut();
+        localStorage.clear();
+        window.location.href = "/login";
+      } catch (e) {
+        alert("Logout failed: " + e.message);
+      }
+    };
+
+    // Role badge + Admin dashboard link injection
+    document.addEventListener("DOMContentLoaded", async () => {
+      const uid = localStorage.getItem("uid");
+      const navbar = document.querySelector(".navbar-nav");
+      const adminLink = document.getElementById("admin-link");
+
+      if (!uid || !navbar || !adminLink) {
+        console.warn("UID or elements missing");
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/user/role?uid=${uid}`);
+        const role = await res.text();
+
+        console.log("User role:", role);
+
+        // Show role badge
+        const badge = document.createElement("span");
+        badge.innerText = role;
+        badge.className = `badge rounded-pill ${role === 'ADMIN' ? 'bg-primary' : 'bg-secondary'} ms-3 d-flex align-items-center justify-content-center px-3 py-2`;
+        badge.className.height = "38px";
+        navbar.appendChild(badge);
+
+        // Enable Admin Dashboard if ADMIN
+        if (role === "ADMIN") {
+          adminLink.classList.remove("d-none");
+          adminLink.href = `/tasks/admin/dashboard?uid=${uid}`;
+        }
+
+      } catch (e) {
+        console.error("Failed to fetch role:", e);
+      }
+    });
+  </script>
+</head>
+
+<body class="d-flex flex-column min-vh-100">
+<!-- Navbar -->
+<div th:replace="fragments/header :: navbar"></div>
+
+<main class="flex-grow-1">
+  <div layout:fragment="content"></div>
+</main>
+
+<footer class="text-center text-muted p-3 small border-top" style="background-color: #f8f9fa;">
+  WorkSync v1.0 © 2025 — Selim Korfez (P2717647)
+</footer>
+</body>
+
+
+</html>
