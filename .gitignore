@@ -33,3 +33,13 @@ build/
 .vscode/
 *.json
 **.json
+
+# Local credentials and environment overrides
+.env
+.env.*
+!.env.example
+application-local.properties
+src/main/resources/application-local.properties
+*.pem
+*.key
+serviceAccountKey.json
