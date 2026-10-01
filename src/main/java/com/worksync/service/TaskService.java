@@ -1,158 +1,100 @@
 package com.worksync.service;
 
-import com.google.api.core.ApiFuture;
-import com.google.cloud.firestore.DocumentSnapshot;
-import com.google.cloud.firestore.Firestore;
-import com.google.cloud.firestore.WriteResult;
-import com.google.firebase.cloud.FirestoreClient;
 import com.worksync.model.Task;
-
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.Comparator;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
-import org.springframework.beans.factory.annotation.Autowired;
-
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
-import java.util.Date;
-import java.text.SimpleDateFormat;
-
 
 @Service
 public class TaskService {
-    @Autowired
-    private FirebaseService firebaseService;
 
+    private final Map<String, Task> tasks = new ConcurrentHashMap<>();
 
-    public List<Task> getTasksByUser(String uid) throws ExecutionException, InterruptedException {
-        return firebaseService.getTasksByUser(uid);
-
-
-
+    public List<Task> getTasksByUser(String uid) {
+        return tasks.values().stream()
+                .filter(task -> uid.equals(task.getAssignedToUid()))
+                .collect(Collectors.toList());
     }
 
-
-    public String createTask(Task task, String assignedByUid) throws Exception {
-        Firestore db = FirestoreClient.getFirestore();
-
+    public String createTask(Task task, String assignedByUid) {
         String taskId = UUID.randomUUID().toString();
         task.setId(taskId);
         task.setStatus("PENDING");
-
-        // Set the creator's UID
         task.setAssignedByUid(assignedByUid);
-
-        ApiFuture<WriteResult> result = db.collection("tasks").document(taskId).set(task);
-        return "Task created with ID: " + taskId + " at " + result.get().getUpdateTime();
+        tasks.put(taskId, task);
+        return taskId;
     }
 
-
-
-    public List<Task> getAllTasks() throws ExecutionException, InterruptedException {
-        return firebaseService.getAllTasks();
+    public List<Task> getAllTasks() {
+        return List.copyOf(tasks.values());
     }
 
-    public Task getTaskById(String id) throws Exception {
-        Firestore db = FirestoreClient.getFirestore();
-        DocumentSnapshot snapshot = db.collection("tasks").document(id).get().get();
-        return snapshot.exists() ? snapshot.toObject(Task.class) : null;
+    public Task getTaskById(String id) {
+        return tasks.get(id);
     }
 
-    public void updateTask(Task task) throws Exception {
-        Firestore db = FirestoreClient.getFirestore();
-        db.collection("tasks").document(task.getId()).set(task);
-    }
-    public void deleteTaskById(String id) throws Exception {
-        Firestore db = FirestoreClient.getFirestore();
-        db.collection("tasks").document(id).delete();
+    public void updateTask(Task task) {
+        if (task == null || task.getId() == null) throw new IllegalArgumentException("Task does not exist");
+        tasks.put(task.getId(), task);
     }
 
-
-    public List<Task> getTasksByUserAndStatus(String uid, String status, String sort) throws ExecutionException, InterruptedException {
-        return firebaseService.getTasksByUserAndStatus(uid, status, sort);
+    public void deleteTaskById(String id) {
+        tasks.remove(id);
     }
-    public List<Task> getTasksByUserFilteredAndSorted(String uid, String status, String sort) throws ExecutionException, InterruptedException {
-        List<Task> tasks = firebaseService.getTasksByUser(uid);
 
-        // Exclude archived tasks
-        tasks = tasks.stream()
+    public List<Task> getTasksByUserAndStatus(String uid, String status, String sort) {
+        return getTasksByUserFilteredAndSorted(uid, status, sort);
+    }
+
+    public List<Task> getTasksByUserFilteredAndSorted(String uid, String status, String sort) {
+        Comparator<Task> comparator = Comparator.comparing(Task::getDeadline, Comparator.nullsLast(Comparator.naturalOrder()));
+        if ("status".equals(sort)) {
+            comparator = Comparator.comparing(task -> switch (task.getStatus()) {
+                case "PENDING" -> 1;
+                case "IN_PROGRESS" -> 2;
+                case "COMPLETED" -> 3;
+                default -> 4;
+            });
+        }
+
+        return getTasksByUser(uid).stream()
                 .filter(task -> !task.isArchived())
+                .filter(task -> status == null || status.isBlank() || status.equals(task.getStatus()))
+                .sorted(comparator)
                 .collect(Collectors.toList());
-
-        //  Filter by status if provided
-        if (status != null && !status.isEmpty()) {
-            tasks = tasks.stream()
-                    .filter(task -> status.equals(task.getStatus()))
-                    .collect(Collectors.toList());
-        }
-
-        // Sort by deadline or status if specified
-        if (sort != null && !sort.isEmpty()) {
-            if (sort.equals("deadline")) {
-                tasks.sort(Comparator.comparing(
-                        Task::getDeadline,
-                        Comparator.nullsLast(Comparator.naturalOrder())
-                ));
-            } else if (sort.equals("status")) {
-                tasks.sort(Comparator.comparing(task -> {
-                    if (task.isLate()) return 0;
-                    return switch (task.getStatus()) {
-                        case "PENDING" -> 1;
-                        case "IN_PROGRESS" -> 2;
-                        case "COMPLETED" -> 3;
-                        default -> 4;
-                    };
-                }));
-            }
-        }
-
-            return tasks;
     }
 
-    // URGENT tasks
-    public List<Task> getUrgentTasks(String uid) throws ExecutionException, InterruptedException {
-        return firebaseService.getTasksByUser(uid).stream()
+    public List<Task> getUrgentTasks(String uid) {
+        return getTasksByUser(uid).stream()
                 .filter(Task::isUrgent)
-                .filter(task -> {
-                    String s = task.getStatus();
-                    return "PENDING".equalsIgnoreCase(s) || "IN_PROGRESS".equalsIgnoreCase(s);
-                })
+                .filter(task -> !"COMPLETED".equalsIgnoreCase(task.getStatus()))
                 .collect(Collectors.toList());
     }
 
-
-    // Due soon (today or earlier)
-    public List<Task> getDueTasks(String uid) throws ExecutionException, InterruptedException {
-        Date now = new Date();
-        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd");
-
-        return firebaseService.getTasksByUser(uid).stream()
+    public List<Task> getDueTasks(String uid) {
+        LocalDate today = LocalDate.now();
+        return getTasksByUser(uid).stream()
+                .filter(task -> !"COMPLETED".equalsIgnoreCase(task.getStatus()))
                 .filter(task -> {
                     try {
-                        if (task.getDeadline() == null || task.getDeadline().isEmpty()) return false;
-                        Date deadline = sdf.parse(task.getDeadline());
-                        return !deadline.after(now); // due today or earlier
-                    } catch (Exception e) {
+                        return task.getDeadline() != null && !LocalDate.parse(task.getDeadline()).isAfter(today);
+                    } catch (RuntimeException ignored) {
                         return false;
                     }
                 })
-                .filter(task -> {
-                    String s = task.getStatus();
-                    return "PENDING".equalsIgnoreCase(s) || "IN_PROGRESS".equalsIgnoreCase(s);
-                })
                 .collect(Collectors.toList());
     }
 
-
-    // Recent (sorted by deadline descending)
-    public List<Task> getRecentTasks(String uid) throws ExecutionException, InterruptedException {
-        return firebaseService.getTasksByUser(uid).stream()
+    public List<Task> getRecentTasks(String uid) {
+        return getTasksByUser(uid).stream()
                 .sorted(Comparator.comparing(Task::getDeadline, Comparator.nullsLast(Comparator.reverseOrder())))
                 .limit(5)
                 .collect(Collectors.toList());
     }
-
 }
-

@@ -15,7 +15,10 @@ public class GlobalModelInjector {
 
     @ModelAttribute
     public void addUserAttributes(Model model, HttpServletRequest request) {
-        String uid = request.getParameter("uid");
+        String uid = (String) request.getSession().getAttribute("uid");
+        if (uid == null || uid.isBlank()) {
+            uid = request.getParameter("uid");
+        }
         if (uid != null && !uid.isBlank()) {
             model.addAttribute("uid", uid);
             try {

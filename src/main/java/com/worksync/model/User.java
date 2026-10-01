@@ -2,7 +2,7 @@ package com.worksync.model;
 
 public class User {
 
-    private String uid;         // Firebase UID
+    private String uid;
     private String fullName;
     private String email;
     private String role;        // "ADMIN" or "EMPLOYEE"

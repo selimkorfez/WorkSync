@@ -1,9 +1,5 @@
 package com.worksync.controller;
 
-import com.google.api.core.ApiFuture;
-import com.google.cloud.firestore.DocumentSnapshot;
-import com.google.cloud.firestore.QueryDocumentSnapshot;
-import com.google.cloud.firestore.QuerySnapshot;
 import com.worksync.model.Task;
 import com.worksync.model.TimeEntry;
 import com.worksync.model.User;
@@ -16,9 +12,6 @@ import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
-import com.google.cloud.firestore.Firestore;
-import com.google.firebase.cloud.FirestoreClient;
-
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -36,10 +29,6 @@ public class TaskController {
 
     @Autowired
     private UserService userService;
-
-    private final Firestore firestore = FirestoreClient.getFirestore();
-
-
 
     @GetMapping("/form")
     public String showForm(HttpServletRequest request, Model model) {
@@ -460,13 +449,10 @@ public class TaskController {
         String uid = (String) session.getAttribute("uid");
         if (uid == null) return "redirect:/login";
 
-        DocumentSnapshot snapshot = firestore.collection("tasks").document(id).get().get();
-        if (snapshot.exists()) {
-            Task task = snapshot.toObject(Task.class);
-            if (task != null && "COMPLETED".equals(task.getStatus())) {
-                task.setArchived(true);
-                firestore.collection("tasks").document(id).set(task);
-            }
+        Task task = taskService.getTaskById(id);
+        if (task != null && "COMPLETED".equals(task.getStatus())) {
+            task.setArchived(true);
+            taskService.updateTask(task);
         }
         redirectAttributes.addFlashAttribute("success", "Task archived successfully.");
         return "redirect:/tasks/list?uid=" + uid;
@@ -477,16 +463,9 @@ public class TaskController {
         String uid = (String) session.getAttribute("uid");
         if (uid == null) return "redirect:/login";
 
-        List<Task> archivedTasks = new ArrayList<>();
-        ApiFuture<QuerySnapshot> future = firestore.collection("tasks").get();
-        List<QueryDocumentSnapshot> documents = future.get().getDocuments();
-
-        for (QueryDocumentSnapshot doc : documents) {
-            Task task = doc.toObject(Task.class);
-            if (task.isArchived() && uid.equals(task.getAssignedToUid())) {
-                archivedTasks.add(task);
-            }
-        }
+        List<Task> archivedTasks = taskService.getTasksByUser(uid).stream()
+                .filter(Task::isArchived)
+                .collect(Collectors.toList());
 
 
         // Resolve UID to Full Name
@@ -515,14 +494,11 @@ public class TaskController {
         String uid = (String) session.getAttribute("uid");
         if (uid == null) return "redirect:/login";
 
-        DocumentSnapshot snapshot = firestore.collection("tasks").document(id).get().get();
-        if (snapshot.exists()) {
-            Task task = snapshot.toObject(Task.class);
-            if (task != null && task.isArchived()) {
-                task.setArchived(false);
-                firestore.collection("tasks").document(id).set(task);
-                redirectAttributes.addFlashAttribute("success", "Task unarchived successfully.");
-            }
+        Task task = taskService.getTaskById(id);
+        if (task != null && task.isArchived()) {
+            task.setArchived(false);
+            taskService.updateTask(task);
+            redirectAttributes.addFlashAttribute("success", "Task unarchived successfully.");
         }
         redirectAttributes.addFlashAttribute("success", "Task unarchived successfully.");
         return "redirect:/tasks/archived";

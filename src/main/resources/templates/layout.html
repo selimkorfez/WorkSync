@@ -6,25 +6,11 @@
   <meta charset="UTF-8">
   <title>WorkSync</title>
 
-  <!-- Firebase -->
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
-
   <script>
-    const firebaseConfig = {
-    };
-    firebase.initializeApp(firebaseConfig);
-    const auth = firebase.auth();
-
-    // Logout handler
     window.logout = async function () {
-      try {
-        await auth.signOut();
-        localStorage.clear();
-        window.location.href = "/login";
-      } catch (e) {
-        alert("Logout failed: " + e.message);
-      }
+      await fetch("/logout", { method: "POST" });
+      localStorage.clear();
+      window.location.href = "/login";
     };
 
     // Role badge + Admin dashboard link injection

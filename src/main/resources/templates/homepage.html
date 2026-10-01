@@ -106,7 +106,9 @@
   </div>
 </div>
 
-<script>
+<script th:inline="javascript">
+  localStorage.setItem("uid", /*[[${uid}]]*/ "");
+  localStorage.setItem("email", /*[[${email}]]*/ "");
   const today = new Date().toISOString().split("T")[0];
   if (localStorage.getItem("notification-sound-date") !== today) {
     localStorage.removeItem("notification-sound-played");

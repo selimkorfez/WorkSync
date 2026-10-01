@@ -2,16 +2,15 @@ package com.worksync.model;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import jakarta.persistence.Transient;
 import java.util.List;
 import java.util.ArrayList;
 
 public class Task {
 
-    private String id; // Firestore document ID
+    private String id;
     private String title;
     private String description;
-    private String assignedToUid; // User UID from Firebase
+    private String assignedToUid;
     private String assignedByUid;
     private String deadline;
     private String status; // "PENDING", "IN_PROGRESS", "COMPLETED"
@@ -21,7 +20,6 @@ public class Task {
     private String completionTime;
 
 
-    @Transient
     private String completionTimeFormatted;
 
     public Task() {
@@ -77,7 +75,6 @@ public class Task {
 
     public void setCompletionTime(String completionTime) { this.completionTime = completionTime; }
 
-    @Transient
     public boolean isLate() {
         if (status != null && !"COMPLETED".equals(status) && deadline != null && !deadline.isBlank()) {
             try {
